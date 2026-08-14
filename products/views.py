@@ -12,9 +12,12 @@ from rest_framework.generics import (
     ListCreateAPIView,
     RetrieveUpdateDestroyAPIView,
 ) 
+from rest_framework.viewsets import ModelViewSet
+from rest_framework.decorators import action
+from rest_framework.permissions import IsAuthenticated
+from .permissions import IsAdminReadOnly, IsOwnerOrAdmin
 
 # Create your views here
-
 # This is a method using manual API creation
 @csrf_exempt
 def products(request):
@@ -112,6 +115,64 @@ def product_list_api(request):
             status=400
         )
 
+@api_view(["PUT", "PATCH", "DELETE"])
+def product_update_delete_api(request, id):
+    try:
+        product = Product.objects.get(id=id)
+    except Product.DoesNotExist:
+        return Response(
+            {"error": "Product Not Found"},
+            status = 404
+        )
+
+    if request.method == "PUT":
+        serializer = ProductSerializer(
+            product,
+            data=request.data
+        )
+
+        if serializer.is_valid():
+            serializer.save()
+
+            return Response(
+                serializer.data,
+                status=200
+            )
+
+        return Response(
+            serializer.errors,
+            status=400
+        )
+
+    elif request.method == "PATCH":
+        serializer = ProductSerializer(
+            product,
+            data=request.data,
+            partial=True
+        )
+
+        if serializer.is_valid():
+            serializer.save()
+
+            return Response(
+                serializer.data,
+                status=200
+            )
+
+        return Response(
+            serializer.errors,
+            status=400
+        )
+
+    elif request.method == "DELETE":
+        product.delete()
+
+        return Response(
+            {"message": "Product deleted successfully"},
+            status=204
+        )
+
+# This method is using Generic View
 # This is a method using ListAPIView
 class ProductListAPIView(APIView):
     def get(self, request):
@@ -143,13 +204,17 @@ class ProductDetailAPIView(APIView):
 
     def put(self, request, id):
         product = self.get_product(id)
+        # Here we are serializing the data coming from the request and the existing product instance
         serializer = ProductSerializer(
             product,
+            # Here we are deserializing the data coming from the request to update the existing product instance
             data=request.data
         )
 
+        # Here also the data will be converted to Python dictionary using deserializer and the validated
         if serializer.is_valid():
             serializer.save()
+            # Here we are returning the serialized data of the updated product instance
             return Response(serializer.data)
 
         return Response(
@@ -176,3 +241,47 @@ class ProductListCreateAPIView(ListCreateAPIView):
 class ProductDetailGenericAPIView(RetrieveUpdateDestroyAPIView):
     queryset = Product.objects.all()
     serializer_class = ProductSerializer
+
+# This is the concept of Viewset
+class ProductViewSet(ModelViewSet):
+    queryset = Product.objects.all()
+    serializer_class = ProductSerializer
+    # This is Authentication part, Every Request requires an Authenticated user
+    permission_classes = [IsAdminReadOnly, IsOwnerOrAdmin]
+
+    def get_queryset(self):
+        # If the user is staff, which means he is an admin, then return all the products
+        if self.request.user.is_staff:
+            return Product.objects.all()
+
+        # Else return only the products which are owner by the user who is making the request
+        return Product.objects.filter(
+            owner = self.request.user
+        )
+
+    def perform_create(self, serializer):
+        # Here we are setting the owner of the product to the user who is making the request
+        serializer.save(owner=self.request.user)
+
+    # detail = True -> Action for ONE object
+    @action(detail=True, methods=["post"])
+    def mark_out_of_stock(self, request, pk=None):
+        product = self.get_object()
+        product.quantity = 0
+        product.save()
+
+        return Response({
+            "message": "Product marked as out of Stock",
+            "product_id": product.id
+        })
+
+    # detail = False -> Action for a COLLECTION
+    @action(detail=False, methods=["get"])
+    def low_stock(self, request):
+        products = Product.objects.filter(quantity__lt=5)
+
+        serializer = ProductSerializer(
+            products,
+            many=True
+        )
+        return Response(serializer.data)

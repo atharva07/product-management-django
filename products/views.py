@@ -15,7 +15,7 @@ from rest_framework.generics import (
 from rest_framework.viewsets import ModelViewSet
 from rest_framework.decorators import action
 from rest_framework.permissions import IsAuthenticated
-from .permissions import IsAdminReadOnly, IsOwnerOrAdmin
+from .permissions import ProductRBACPermission
 
 # Create your views here
 # This is a method using manual API creation
@@ -243,28 +243,70 @@ class ProductDetailGenericAPIView(RetrieveUpdateDestroyAPIView):
     serializer_class = ProductSerializer
 
 # This is the concept of Viewset
+# class ProductViewSet(ModelViewSet):
+#     queryset = Product.objects.all()
+#     serializer_class = ProductSerializer
+#     # This is Authentication part, Every Request requires an Authenticated user
+#     #permission_classes = [IsAdminReadOnly, IsOwnerOrAdmin]
+#     permission_classes = [ProductRBACPermission]
+
+#     def get_queryset(self):
+#         # If the user is staff, which means he is an admin, then return all the products
+#         if self.request.user.is_staff:
+#             return Product.objects.all()
+
+#         # Else return only the products which are owner by the user who is making the request
+#         return Product.objects.filter(
+#             owner = self.request.user
+#         )
+
+#     def perform_create(self, serializer):
+#         # Here we are setting the owner of the product to the user who is making the request
+#         serializer.save(owner=self.request.user)
+
+#     # detail = True -> Action for ONE object
+#     @action(detail=True, methods=["post"])
+#     def mark_out_of_stock(self, request, pk=None):
+#         product = self.get_object()
+#         product.quantity = 0
+#         product.save()
+
+#         return Response({
+#             "message": "Product marked as out of Stock",
+#             "product_id": product.id
+#         })
+
+#     # detail = False -> Action for a COLLECTION
+#     @action(detail=False, methods=["get"])
+#     def low_stock(self, request):
+#         products = Product.objects.filter(quantity__lt=5)
+
+#         serializer = ProductSerializer(
+#             products,
+#             many=True
+#         )
+#         return Response(serializer.data)
+
 class ProductViewSet(ModelViewSet):
     queryset = Product.objects.all()
     serializer_class = ProductSerializer
-    # This is Authentication part, Every Request requires an Authenticated user
-    permission_classes = [IsAdminReadOnly, IsOwnerOrAdmin]
+    permission_classes = [ProductRBACPermission]
 
     def get_queryset(self):
-        # If the user is staff, which means he is an admin, then return all the products
-        if self.request.user.is_staff:
+        if self.request.user.groups.filter(
+            name="Admin"
+        ).exists():
             return Product.objects.all()
 
-        # Else return only the products which are owner by the user who is making the request
         return Product.objects.filter(
-            owner = self.request.user
+            owner=self.request.user
         )
 
     def perform_create(self, serializer):
-        # Here we are setting the owner of the product to the user who is making the request
         serializer.save(owner=self.request.user)
 
-    # detail = True -> Action for ONE object
-    @action(detail=True, methods=["post"])
+    # These are custom actions, which are not part of the standard CRUD operations
+    @action(detail=True, methods=["POST"])
     def mark_out_of_stock(self, request, pk=None):
         product = self.get_object()
         product.quantity = 0
@@ -275,13 +317,13 @@ class ProductViewSet(ModelViewSet):
             "product_id": product.id
         })
 
-    # detail = False -> Action for a COLLECTION
-    @action(detail=False, methods=["get"])
+    @action(detail=False, methods=["GET"])
     def low_stock(self, request):
         products = Product.objects.filter(quantity__lt=5)
 
         serializer = ProductSerializer(
-            products,
+            products, 
             many=True
         )
+
         return Response(serializer.data)

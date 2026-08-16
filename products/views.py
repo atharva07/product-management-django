@@ -14,8 +14,9 @@ from rest_framework.generics import (
 ) 
 from rest_framework.viewsets import ModelViewSet
 from rest_framework.decorators import action
-from rest_framework.permissions import IsAuthenticated
-from .permissions import ProductRBACPermission
+from rest_framework.permissions import IsAuthenticated, DjangoModelPermissions
+from .permissions import ProductRBACPermission, IsOwnerOrAdmin
+from .pagination import ProductPagination
 
 # Create your views here
 # This is a method using manual API creation
@@ -290,7 +291,11 @@ class ProductDetailGenericAPIView(RetrieveUpdateDestroyAPIView):
 class ProductViewSet(ModelViewSet):
     queryset = Product.objects.all()
     serializer_class = ProductSerializer
-    permission_classes = [ProductRBACPermission]
+    pagination_class = ProductPagination
+    permission_classes = [
+        DjangoModelPermissions, 
+        IsOwnerOrAdmin
+    ]
 
     def get_queryset(self):
         if self.request.user.groups.filter(

@@ -1,4 +1,7 @@
-from rest_framework.permissions import BasePermission
+from rest_framework.permissions import (
+    BasePermission,
+    DjangoModelPermissions,
+)
 
 # class IsAdminReadOnly(BasePermission):
 #     # Can this user access this view ?
@@ -81,3 +84,9 @@ class ProductRBACPermission(BasePermission):
             return view.action in allowed_actions
 
         return False
+
+class IsOwnerOrAdmin(BasePermission):
+    def has_object_permission(self, request, view, obj):
+        if request.user.groups.filter(name="Admin").exists():
+            return True
+        return obj.owner == request.user

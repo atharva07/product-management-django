@@ -42,6 +42,7 @@ INSTALLED_APPS = [
     "rest_framework",
     "rest_framework.authtoken",
     "rest_framework_simplejwt.token_blacklist",
+    "django_filters",
 ]
 
 MIDDLEWARE = [
@@ -142,13 +143,36 @@ REST_FRAMEWORK = {
     "DEFAULT_AUTHENTICATION_CLASSES": [
         "rest_framework_simplejwt.authentication.JWTAuthentication",
     ],
+
     "DEFAULT_PERMISSION_CLASSES": [
         "rest_framework.permissions.IsAuthenticated",
     ],
-    "DEFAULT_PAGINATION_CLASS": 
+
+    "DEFAULT_PAGINATION_CLASS": [
         "rest_framework.pagination.LimitOffsetPagination",
+    ],
     
     "PAGE_SIZE": 3,
+
+    "DEFAULT_FILTER_BACKENDS": [
+        "django_filters.rest_framework.DjangoFilterBackend",
+    ],
+
+    "DEFAULT_THROTTLE_CLASSES": [
+        # "rest_framework.throttling.AnonRateThrottle",
+        # "rest_framework.throttling.UserRateThrottle",
+        "rest_framework.throttling.ScopedRateThrottle",
+    ],
+
+    # "DEFAULT_THROTTLE_RATES": {
+    #     "anon": "3/minute",
+    #     "user": "5/minute",
+    # }
+
+    "DEFAULT_THROTTLE_RATES": {
+        "products": "10/minute",
+        "low_stock": "2/minute",
+    },
 }
 
 SIMPLE_JWT = {

@@ -17,6 +17,10 @@ from rest_framework.decorators import action
 from rest_framework.permissions import IsAuthenticated, DjangoModelPermissions
 from .permissions import ProductRBACPermission, IsOwnerOrAdmin
 from .pagination import ProductPagination
+from django_filters.rest_framework import DjangoFilterBackend
+from .filters import ProductFilter
+from rest_framework.filters import SearchFilter, OrderingFilter
+from .throttles import LowStockThrottle
 
 # Create your views here
 # This is a method using manual API creation
@@ -291,11 +295,52 @@ class ProductDetailGenericAPIView(RetrieveUpdateDestroyAPIView):
 class ProductViewSet(ModelViewSet):
     queryset = Product.objects.all()
     serializer_class = ProductSerializer
+
+    def get_throttles(self):
+        if self.action == "low_stock":
+            return [LowStockThrottle()]
+        else:
+            self.throttle_scope = "products"
+
+        return super().get_throttles()
+
+    # throttle_scope = "products"
     pagination_class = ProductPagination
     permission_classes = [
         DjangoModelPermissions, 
         IsOwnerOrAdmin
     ]
+
+    # This is the concept of filtering, which is provided by the DjangoFilterBackend
+    filter_backends = [
+        DjangoFilterBackend,
+        SearchFilter,
+        OrderingFilter
+    ]
+
+    # filterset_fields = [
+    #     "name",
+    #     "price",
+    #     "quantity",
+    # ]
+
+    # This is the concept of using custom filter class, which is defined in filters.py file
+    filterset_class = ProductFilter
+
+    # This is the search functionality, which is provided by the SearchFilter backend
+    search_fields = [
+        "name",
+        "description",
+    ]
+
+    ordering_fields = [
+        "name",
+        "price",
+        "quantity",
+        "created_at",
+    ]
+
+    pagination_class = ProductPagination
 
     def get_queryset(self):
         if self.request.user.groups.filter(
